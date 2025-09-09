@@ -5,22 +5,38 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 func main() {
 	file, err := os.Open("messages.txt")
 	if err != nil {
-		fmt.Printf("error when reading messages.txt: %v", err)
+		fmt.Printf("error when opening messages.txt: %v", err)
 		os.Exit(1)
 	}
 	defer file.Close()
 
-	buff := make([]byte, 8)
+	current := ""
 	for {
-		if _, err = file.Read(buff); errors.Is(err, io.EOF) {
-			os.Exit(0)
+		buff := make([]byte, 8)
+		n, err := file.Read(buff)
+		str := string(buff[:n])
+		parts := strings.Split(str, "\n")
+		for _, l := range parts[:len(parts)-1] {
+			fmt.Printf("read: %s%s\n", current, l)
+			current = ""
 		}
-		fmt.Printf("read: %s\n", buff)
-		clear(buff)
+		current += parts[len(parts)-1]
+		if err != nil {
+			if current != "" {
+				fmt.Printf("read: %s\n", current)
+				current = ""
+			}
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			fmt.Printf("error: %s\n", err.Error())
+			break
+		}
 	}
 }
