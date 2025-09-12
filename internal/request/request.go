@@ -66,7 +66,8 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	return r, nil
 }
 
-func parseRequestLine(s string) (*RequestLine, int, error) {
+func parseRequestLine(data []byte) (*RequestLine, int, error) {
+	s := string(data)
 	if !strings.Contains(s, "\r\n") {
 		return nil, 0, nil
 	}
@@ -104,7 +105,7 @@ func parseRequestLine(s string) (*RequestLine, int, error) {
 func (r *Request) parse(data []byte) (int, error) {
 	switch r.State {
 	case Initialized:
-		line, n, err := parseRequestLine(string(data))
+		line, n, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
 		}
