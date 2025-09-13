@@ -3,7 +3,6 @@ package headers
 import (
 	"errors"
 	"strings"
-	"unicode"
 )
 
 type Headers map[string]string
@@ -27,15 +26,25 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	if !ok {
 		return 0, false, errors.New("there must be a colon present for each header")
 	}
+	if len(before) == 0 {
+		return 0, false, errors.New("the field name must have a length of at least 1")
+	}
 	bTrim := strings.TrimLeft(before, " ")
+	if len(bTrim) == 0 {
+		return 0, false, errors.New("the field name must have at least 1 non-space character directly preceeding the colon")
+	}
 	bTrimSplit := strings.Split(bTrim, " ")
 	if len(bTrimSplit) > 1 {
 		return 0, false, errors.New("there must be no whitespace between the field name and the colon")
 	}
+	for _, c := range bTrimSplit[0] {
+		if c == '!' || (c >= '#' && c <= '\'') || c == '*' || c == '+' || c == '-' || c == '.' || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= '^' && c <= 'z') || c == '|' || c == '~' {
+			continue
+		}
+		return 0, false, errors.New("the field name must only contain alphanumeric characters & [!, #, $, %, &, ', *, +, -, ., ^, _, `, |, ~]")
+	}
+	bTrim = strings.ToLower(bTrim)
 	aTrim := strings.TrimSpace(after)
-	r := []rune(bTrim)
-	r[0] = unicode.ToUpper(r[0])
-	bTrim = string(r)
 	h[bTrim] = aTrim
 
 	return len(split) + 2, false, nil

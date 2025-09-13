@@ -9,11 +9,11 @@ import (
 func TestHeadersParse(t *testing.T) {
 	// Test: Valid single header
 	headers := NewHeaders()
-	data := []byte("Host: localhost:42069\r\n\r\n")
+	data := []byte("HoSt: localhost:42069\r\n\r\n")
 	n, done, err := headers.Parse(data)
 	assert.NoError(t, err)
 	assert.NotNil(t, headers)
-	assert.Equal(t, "localhost:42069", headers["Host"])
+	assert.Equal(t, "localhost:42069", headers["host"])
 	assert.Equal(t, 23, n)
 	assert.False(t, done)
 
