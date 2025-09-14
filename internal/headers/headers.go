@@ -18,7 +18,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, nil
 	}
 	if s[:2] == "\r\n" {
-		return 0, true, nil
+		return 2, true, nil
 	}
 
 	split, _, _ := strings.Cut(s, "\r\n")
@@ -45,7 +45,12 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 	bTrim = strings.ToLower(bTrim)
 	aTrim := strings.TrimSpace(after)
-	h[bTrim] = aTrim
+	if _, ok = h[bTrim]; !ok {
+		h[bTrim] = aTrim
+	} else {
+		slice := []string{h[bTrim], aTrim}
+		h[bTrim] = strings.Join(slice, ", ")
+	}
 
 	return len(split) + 2, false, nil
 }

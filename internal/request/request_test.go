@@ -30,7 +30,7 @@ func TestRequestLineParse(t *testing.T) {
 	// Test: Good GET Request line
 	reader := &chunkReader{
 		data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
-		numBytesPerRead: 3,
+		numBytesPerRead: 4,
 	}
 	r, err := RequestFromReader(reader)
 	assert.NoError(t, err)
@@ -42,7 +42,7 @@ func TestRequestLineParse(t *testing.T) {
 	// Test: Good GET Request line with path
 	reader = &chunkReader{
 		data:            "GET /coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
-		numBytesPerRead: 1,
+		numBytesPerRead: 4,
 	}
 	r, err = RequestFromReader(reader)
 	assert.NoError(t, err)
@@ -82,8 +82,62 @@ func TestRequestLineParse(t *testing.T) {
 	// Test: Invalid version in Request line
 	reader = &chunkReader{
 		data:            "GET / HTTP/3.0\r\nHost: localhost:42069\r\nUser-Agent: curl/8.5.0\r\nAccept: */*\r\n\r\n",
-		numBytesPerRead: 2,
+		numBytesPerRead: 4,
 	}
 	_, err = RequestFromReader(reader)
 	assert.Error(t, err)
+}
+
+func TestRequestHeadersParse(t *testing.T) {
+	// Test: Standard Headers
+	reader := &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n",
+		numBytesPerRead: 3,
+	}
+	r, err := RequestFromReader(reader)
+	assert.NoError(t, err)
+	assert.NotNil(t, r)
+	assert.Equal(t, "localhost:42069", r.Headers["host"])
+	assert.Equal(t, "curl/7.81.0", r.Headers["user-agent"])
+	assert.Equal(t, "*/*", r.Headers["accept"])
+
+	// Test: Empty Headers
+	reader = &chunkReader{
+		data:            "GET / HTTP/1.1\r\n\r\n",
+		numBytesPerRead: 5,
+	}
+	r, err = RequestFromReader(reader)
+	assert.NoError(t, err)
+	assert.NotNil(t, r)
+	assert.Equal(t, 0, len(r.Headers))
+
+	// Test: Malformed Header
+	reader = &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost localhost:42069\r\n\r\n",
+		numBytesPerRead: 3,
+	}
+	_, err = RequestFromReader(reader)
+	assert.Error(t, err)
+
+	// Test: Duplicate Headers
+	reader = &chunkReader{
+		data:            "GET / HTTP/1.1\r\nHost: localhost:8080\r\nHost: localhost:8000\r\nUser-Agent: curl/8.5.0\r\n\r\n",
+		numBytesPerRead: 8,
+	}
+	r, err = RequestFromReader(reader)
+	assert.NoError(t, err)
+	assert.NotNil(t, r)
+	assert.Equal(t, "localhost:8080, localhost:8000", r.Headers["host"])
+	assert.Equal(t, "curl/8.5.0", r.Headers["user-agent"])
+
+	// Test: Case Insensitive Headers
+	reader = &chunkReader{
+		data:            "GET / HTTP/1.1\r\nhOSt: localhost:42069\r\nuSeR-agEnT: curl/8.5.0\r\n\r\n",
+		numBytesPerRead: 30,
+	}
+	r, err = RequestFromReader(reader)
+	assert.NoError(t, err)
+	assert.NotNil(t, r)
+	assert.Equal(t, "localhost:42069", r.Headers["host"])
+	assert.Equal(t, "curl/8.5.0", r.Headers["user-agent"])
 }
