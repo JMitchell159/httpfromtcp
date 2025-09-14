@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/JMitchell159/httpfromtcp/internal/headers"
@@ -14,6 +15,7 @@ type state int
 const (
 	Initialized state = iota
 	ParsingHeaders
+	ParsingBody
 	Done
 )
 
@@ -22,6 +24,7 @@ const bufferSize = 8
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	State       state
 }
 
@@ -52,6 +55,17 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 		n, err := reader.Read(buff[readToIndex:])
 		if errors.Is(err, io.EOF) {
 			r.State = Done
+			val, ok := r.Headers.Get("Content-Length")
+			if ok {
+				split := strings.Split(val, ", ")
+				length, _ := strconv.Atoi(split[len(split)-1])
+				if r.Body == nil {
+					return nil, errors.New("no body, but Content-Length is present")
+				}
+				if length > len(r.Body) {
+					return nil, errors.New("body length cannot be less than Content-Length")
+				}
+			}
 			break
 		}
 
@@ -117,7 +131,11 @@ func (r *Request) parse(data []byte) (int, error) {
 		if n == 0 {
 			return totalBytesParsed, nil
 		}
+
 		totalBytesParsed += n
+		if totalBytesParsed == len(data) {
+			return totalBytesParsed, nil
+		}
 	}
 
 	return totalBytesParsed, nil
@@ -149,7 +167,22 @@ func (r *Request) parseSingle(data []byte) (int, error) {
 			return n, nil
 		}
 
-		r.State = Done
+		r.State = ParsingBody
+		if _, ok := r.Headers.Get("Content-Length"); !ok {
+			r.State = Done
+		}
+		return n, nil
+	case ParsingBody:
+		sLen, _ := r.Headers.Get("Content-Length")
+		split := strings.Split(sLen, ", ")
+		length, err := strconv.Atoi(split[len(split)-1])
+		if err != nil {
+			return 0, err
+		}
+		if len(r.Body)+len(data) > length {
+			return length, errors.New("body length cannot be greater than Content-Length")
+		}
+		r.Body = append(r.Body, data...)
 		return len(data), nil
 	case Done:
 		return 0, errors.New("trying to read data in done state")
