@@ -2,7 +2,9 @@ package headers
 
 import (
 	"errors"
+	"fmt"
 	"strings"
+	"unicode"
 )
 
 type Headers map[string]string
@@ -43,13 +45,11 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		}
 		return 0, false, errors.New("the field name must only contain alphanumeric characters & [!, #, $, %, &, ', *, +, -, ., ^, _, `, |, ~]")
 	}
-	bTrim = strings.ToLower(bTrim)
 	aTrim := strings.TrimSpace(after)
 	if _, ok = h[bTrim]; !ok {
-		h[bTrim] = aTrim
+		h.Set(bTrim, aTrim)
 	} else {
-		slice := []string{h[bTrim], aTrim}
-		h[bTrim] = strings.Join(slice, ", ")
+		h.Add(bTrim, aTrim)
 	}
 
 	return len(split) + 2, false, nil
@@ -57,10 +57,67 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 func (h Headers) Get(key string) (string, bool) {
 	lKey := strings.ToLower(key)
-	val, ok := h[lKey]
-	if !ok {
-		return "", ok
+	val := ""
+	ok := false
+	switch lKey {
+	case "a-im":
+		val, ok = h["A-IM"]
+	case "te":
+		val, ok = h["TE"]
+	case "x-csrf-token":
+		val, ok = h["X-CSRF-Token"]
+	default:
+		splitKey := strings.Split(lKey, "-")
+		for i, part := range splitKey {
+			r := []rune(part)
+			r[0] = unicode.ToUpper(r[0])
+			splitKey[i] = string(r)
+		}
+		k := strings.Join(splitKey, "-")
+		val, ok = h[k]
 	}
 
 	return val, ok
+}
+
+func (h Headers) Set(key, val string) {
+	lKey := strings.ToLower(key)
+	switch lKey {
+	case "a-im":
+		h["A-IM"] = val
+	case "te":
+		h["TE"] = val
+	case "x-csrf-token":
+		h["X-CSRF-Token"] = val
+	default:
+		splitKey := strings.Split(lKey, "-")
+		for i, part := range splitKey {
+			r := []rune(part)
+			r[0] = unicode.ToUpper(r[0])
+			splitKey[i] = string(r)
+		}
+		k := strings.Join(splitKey, "-")
+		h[k] = val
+	}
+}
+
+func (h Headers) Add(key, val string) {
+	lKey := strings.ToLower(key)
+	switch lKey {
+	case "a-im":
+		h["A-IM"] = fmt.Sprintf("%s, %s", h["A-IM"], val)
+	case "te":
+		h["TE"] = fmt.Sprintf("%s, %s", h["TE"], val)
+	case "x-csrf-token":
+		h["X-CSRF-Token"] = fmt.Sprintf("%s, %s", h["X-CSRF-Token"], val)
+	default:
+		splitKey := strings.Split(lKey, "-")
+		for i, part := range splitKey {
+			r := []rune(part)
+			r[0] = unicode.ToUpper(r[0])
+			splitKey[i] = string(r)
+		}
+		k := strings.Join(splitKey, "-")
+		h[k] = fmt.Sprintf("%s, %s", h[k], val)
+	}
 }
